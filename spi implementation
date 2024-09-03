@@ -1,0 +1,66 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity SPI_Master is
+    Port (
+        clk      : in  STD_LOGIC; -- System clock
+        reset    : in  STD_LOGIC; -- System reset
+        mosi     : out STD_LOGIC; -- Master Out Slave In
+        miso     : in  STD_LOGIC; -- Master In Slave Out
+        sck      : out STD_LOGIC; -- Serial Clock
+        ss       : out STD_LOGIC; -- Slave Select
+        data_in  : in  STD_LOGIC_VECTOR (7 downto 0); -- Data to send
+        data_out : out STD_LOGIC_VECTOR (7 downto 0); -- Received data
+        start    : in  STD_LOGIC; -- Start signal
+        done     : out STD_LOGIC  -- Done signal
+    );
+end SPI_Master;
+
+architecture Behavioral of SPI_Master is
+    signal sck_reg : STD_LOGIC := '0';
+    signal ss_reg  : STD_LOGIC := '1';
+    signal bit_cnt : INTEGER range 0 to 7 := 0;
+    signal mosi_reg, miso_reg : STD_LOGIC;
+    signal shift_reg : STD_LOGIC_VECTOR (7 downto 0);
+    signal busy : STD_LOGIC := '0';
+begin
+
+    process(clk, reset)
+    begin
+        if reset = '1' then
+            sck_reg <= '0';
+            ss_reg <= '1';
+            bit_cnt <= 0;
+            mosi_reg <= '0';
+            busy <= '0';
+            done <= '0';
+        elsif rising_edge(clk) then
+            if start = '1' and busy = '0' then
+                ss_reg <= '0';
+                shift_reg <= data_in;
+                bit_cnt <= 0;
+                busy <= '1';
+                done <= '0';
+            elsif busy = '1' then
+                sck_reg <= not sck_reg;
+                if sck_reg = '1' then
+                    mosi_reg <= shift_reg(7);
+                    shift_reg <= shift_reg(6 downto 0) & miso;
+                    bit_cnt <= bit_cnt + 1;
+                    if bit_cnt = 7 then
+                        busy <= '0';
+                        ss_reg <= '1';
+                        done <= '1';
+                        data_out <= shift_reg;
+                    end if;
+                end if;
+            end if;
+        end if;
+    end process;
+
+    mosi <= mosi_reg;
+    sck <= sck_reg;
+    ss <= ss_reg;
+
+end Behavioral;
